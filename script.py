@@ -25,7 +25,7 @@ TICKERS_ARGENTINOS = {
     "GGAL": ["GGAL", "GGAL.BA"],
     "BMA": ["BMA", "BMA.BA"],
     "PAMP": ["PAMP", "PAMP.BA"],
-    "TXAR": ["TXAR", "TXAR.BA"],
+    "TXAR": ["TXAR", "TXAR.BA", "TX"], # Added TX as common short for TXAR
     "ALUA": ["ALUA", "ALUA.BA"],
     "TECO2": ["TECO2", "TECO2.BA"],
     "MIRG": ["MIRG", "MIRG.BA"],
@@ -36,7 +36,6 @@ TICKERS_ARGENTINOS = {
     "CEPU": ["CEPU", "CEPU.BA"],
     "COME": ["COME", "COME.BA"],
     "BYMA": ["BYMA", "BYMA.BA"],
-    "TX": ["TX", "TXAR", "TXAR.BA"],
 }
 
 def cargar_usuarios():
@@ -84,23 +83,16 @@ def registrar_usuario(chat_id, username, first_name, last_name=None):
     return True
 
 def crear_menu_principal():
-    """Crea el menú principal con botones inline"""
+    """Crea el menú principal con 3 botones principales"""
     keyboard = [
         [
-            InlineKeyboardButton("📊 Analizar Acción", callback_data="analizar"),
             InlineKeyboardButton("⭐ Mis Favoritas", callback_data="favoritas")
         ],
         [
-            InlineKeyboardButton("🇦🇷 Acciones Argentinas", callback_data="argentinas"),
-            InlineKeyboardButton("🇺🇸 Acciones USA", callback_data="usa")
+            InlineKeyboardButton("📊 Analizar Cualquier Acción", callback_data="analizar_cualquier")
         ],
         [
-            InlineKeyboardButton("📈 Resumen del Día", callback_data="resumen"),
-            InlineKeyboardButton("⚙️ Mi Perfil", callback_data="perfil")
-        ],
-        [
-            InlineKeyboardButton("❓ Ayuda", callback_data="ayuda"),
-            InlineKeyboardButton("📚 Guía de Indicadores", callback_data="guia")
+            InlineKeyboardButton("📈 Top 10 del Día", callback_data="top_10_dia")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -170,14 +162,16 @@ def obtener_datos_accion(ticker_original):
     # Eliminar duplicados manteniendo el orden
     variantes = list(dict.fromkeys(variantes))
     
-    print(f"🔍 Probando variantes para {ticker_original}: {variantes[:3]}...")
+    print(f"🔍 Probando variantes para {ticker_original}: {variantes[:5]}...") # Show more variants in log
     
     for i, variante in enumerate(variantes):
         try:
             print(f"  Intentando {i+1}/{len(variantes)}: {variante}")
-            df = yf.download(variante, period='3mo', interval='1d', progress=False, show_errors=False)
+            # Changed period back to 6mo for better indicator calculation
+            df = yf.download(variante, period='6mo', interval='1d', progress=False, show_errors=False)
             
-            if not df.empty and 'Close' in df.columns and len(df) > 5:
+            # Ensure enough data for analysis (e.g., for MACD which needs 26 periods)
+            if not df.empty and 'Close' in df.columns and len(df) > 30: # Increased minimum data points
                 print(f"✅ Datos encontrados para {variante}")
                 return df, variante
                 
@@ -210,7 +204,7 @@ def buscar_ticker_inteligente(ticker_input):
         'GALICIA': 'GGAL', 'GGAL': 'GGAL',
         'MACRO': 'BMA', 'BMA': 'BMA',
         'PAMPA': 'PAMP', 'PAMP': 'PAMP',
-        'TERNIUM': 'TX', 'TX': 'TX',
+        'TERNIUM': 'TX', 'TX': 'TX', # Added TX for Ternium
         'ALUAR': 'ALUA', 'ALUA': 'ALUA',
     }
     
@@ -263,6 +257,7 @@ def generar_sugerencias_ticker(ticker_input):
         'GALICIA': 'GGAL (Banco Galicia)',
         'MACRO': 'BMA (Banco Macro)',
         'PAMPA': 'PAMP (Pampa Energía)',
+        'TERNIUM': 'TX (Ternium Argentina)', # Added Ternium
     }
     
     # Buscar sugerencias exactas
@@ -283,7 +278,7 @@ def generar_sugerencias_ticker(ticker_input):
             'GOOGL (Google)', 'YPF (YPF)', 'GGAL (Galicia)'
         ]
     
-    return sugerencias[:3]  # Máximo 3 sugerencias
+    return list(dict.fromkeys(sugerencias))[:3]  # Máximo 3 sugerencias, sin duplicados
 
 def normalizar_datos(datos):
     """Normaliza los datos para asegurar que sean 1D"""
@@ -633,29 +628,29 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
         # MENSAJE EXPLICATIVO OBLIGATORIO
-        mensaje_explicativo = f"""🚀 ¡BIENVENIDO {user.first_name.upper()} AL BOT DE ANÁLISIS TÉCNICO! 🚀
+        mensaje_explicativo = f"""🚀 **¡BIENVENIDO {user.first_name.upper()} AL BOT DE ANÁLISIS TÉCNICO!** 🚀
 
-🤖 ¿QUÉ HACE ESTE BOT?
+🤖 **¿QUÉ HACE ESTE BOT?**
 
-🔍 ANÁLISIS COMPLETO + SUGERENCIAS DE TRADING:
-• 📊 Análisis técnico: RSI, MACD, soportes y resistencias
-• 🎯 Oportunidades 100% efectivas: Detecta puntos clave para comprar/vender
-• 💡 Sugerencias personalizadas: "Yo esperaría para comprar", "No me adelantaría"
-• 📈 Análisis fundamental: Combina técnico + fundamental para mejores decisiones
+🔍 **ANÁLISIS COMPLETO + SUGERENCIAS DE TRADING:**
+• 📊 **Análisis técnico:** RSI, MACD, soportes y resistencias
+• 🎯 **Oportunidades 100% efectivas:** Detecta puntos clave para comprar/vender
+• 💡 **Sugerencias personalizadas:** "Yo esperaría para comprar", "No me adelantaría"
+• 📈 **Análisis fundamental:** Combina técnico + fundamental para mejores decisiones
 
-🚨 ALERTAS INTELIGENTES (cada 15 minutos):
+🚨 **ALERTAS INTELIGENTES (cada 15 minutos):**
 • Te avisa cuando tus favoritas están en puntos clave
 • Detecta oportunidades de alta confianza
 • Sugerencias específicas para cada situación
 
-🌍 MERCADOS SOPORTADOS:
-• 🇺🇸 USA: AAPL, TSLA, MSFT, GOOGL, AMZN, NVDA, META
-• 🇦🇷 Argentina: YPF, GGAL, BMA, PAMP, TXAR, ALUA
+🌍 **MERCADOS SOPORTADOS:**
+• 🇺🇸 **USA:** AAPL, TSLA, MSFT, GOOGL, AMZN, NVDA, META
+• 🇦🇷 **Argentina:** YPF, GGAL, BMA, PAMP, TXAR, ALUA
 
-⚠️ IMPORTANTE: Este bot es educativo, NO es consejo financiero
+⚠️ **IMPORTANTE:** Este bot es educativo, NO es consejo financiero
 
-🎯 PARA EMPEZAR NECESITAS AGREGAR TUS ACCIONES FAVORITAS
-👇 ¡CONFIGUREMOS TU LISTA AHORA! 👇"""
+🎯 **PARA EMPEZAR NECESITAS AGREGAR TUS ACCIONES FAVORITAS**
+👇 **¡CONFIGUREMOS TU LISTA AHORA!** 👇"""
         
         await update.message.reply_text(
             mensaje_explicativo,
@@ -663,13 +658,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
         # Mensaje obligatorio para setup
-        mensaje_setup = """⭐ CONFIGURACIÓN OBLIGATORIA ⭐
+        mensaje_setup = """⭐ **CONFIGURACIÓN OBLIGATORIA** ⭐
 
-🎯 Necesitas agregar al menos 3 acciones favoritas para comenzar
+🎯 **Necesitas agregar al menos 3 acciones favoritas para comenzar**
 
-📋 Estas acciones recibirán alertas automáticas cada 15 minutos
+📋 **Estas acciones recibirán alertas automáticas cada 15 minutos**
 
-💡 Elige tu método preferido:"""
+💡 **Elige tu método preferido:**"""
         
         await update.message.reply_text(
             mensaje_setup,
@@ -682,7 +677,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         usuario_info = usuarios_registrados[chat_id]
         if not usuario_info.get('setup_completo', False):
             await update.message.reply_text(
-                f"👋 Hola {user.first_name} 👋\n\n⚠️ Necesitas completar tu configuración inicial\n\n🎯 Agrega tus acciones favoritas para comenzar:",
+                f"👋 **Hola {user.first_name}** 👋\n\n⚠️ **Necesitas completar tu configuración inicial**\n\n🎯 **Agrega tus acciones favoritas para comenzar:**",
                 reply_markup=crear_menu_setup_inicial(),
                 parse_mode='Markdown'
             )
@@ -690,17 +685,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Usuario existente con setup completo
             num_favoritas = len(usuario_info.get('acciones_favoritas', []))
             
-            mensaje_bienvenida = f"""👋 ¡HOLA DE NUEVO {user.first_name.upper()}! 👋
+            mensaje_bienvenida = f"""👋 **¡HOLA DE NUEVO {user.first_name.upper()}!** 👋
 
-🤖 Bot de Análisis Técnico - Listo para usar
+🤖 **Bot de Análisis Técnico - Listo para usar**
 
-📊 Tu cuenta:
-• Registrado: {usuario_info['fecha_registro'][:10]}
-• Alertas: {'🔔 ACTIVAS' if usuario_info.get('alertas_activas', True) else '🔕 DESACTIVADAS'}
-• Favoritas: {num_favoritas} acciones configuradas
+📊 **Tu cuenta:**
+• **Registrado:** {usuario_info['fecha_registro'][:10]}
+• **Alertas:** {'🔔 ACTIVAS' if usuario_info.get('alertas_activas', True) else '🔕 DESACTIVADAS'}
+• **Favoritas:** {num_favoritas} acciones configuradas
 
-🚀 ¿Qué quieres analizar hoy?
-👇 SELECCIONA UNA OPCIÓN 👇"""
+🚀 **¿Qué quieres analizar hoy?**
+👇 **SELECCIONA UNA OPCIÓN** 👇"""
             
             await update.message.reply_text(
                 mensaje_bienvenida,
@@ -725,14 +720,27 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
             last_name=user.last_name
         )
     
+    # Verificar si el setup está completo antes de permitir acceso a funciones principales
+    # Las acciones de setup (setup_inicial, setup_sugerencias, add_setup_, finalizar_setup, setup_manual)
+    # son las únicas permitidas si el setup no está completo.
+    if not usuarios_registrados[chat_id].get('setup_completo', False) and \
+       query.data not in ["setup_inicial", "setup_sugerencias", "finalizar_setup", "setup_manual"] and \
+       not query.data.startswith("add_setup_"):
+        await query.edit_message_text(
+            f"⚠️ **CONFIGURACIÓN PENDIENTE** ⚠️\n\n🎯 **Necesitas completar tu setup inicial**\n\n💡 **Agrega tus acciones favoritas primero:**",
+            reply_markup=crear_menu_setup_inicial(),
+            parse_mode='Markdown'
+        )
+        return # Detener el procesamiento si el setup no está completo y no es una acción de setup
+    
     # Manejar setup inicial
     if query.data == "setup_inicial":
         await query.edit_message_text(
-            """⭐ CONFIGURACIÓN INICIAL ⭐
+            """⭐ **CONFIGURACIÓN INICIAL** ⭐
 
-🎯 Necesitas agregar al menos 3 acciones favoritas
+🎯 **Necesitas agregar al menos 3 acciones favoritas**
 
-💡 Elige tu método preferido:""",
+💡 **Elige tu método preferido:**""",
             reply_markup=crear_menu_setup_inicial(),
             parse_mode='Markdown'
         )
@@ -742,15 +750,15 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
         num_favoritas = len(usuario_info.get('acciones_favoritas', []))
         
         await query.edit_message_text(
-            f"""🔥 SUGERENCIAS TOP 🔥
+            f"""🔥 **SUGERENCIAS TOP** 🔥
 
-📊 Acciones más populares para alertas
-🟢 USA | 🔵 Argentina | 🔥 Trending
+📊 **Acciones más populares para alertas**
+🟢 **USA** | 🔵 **Argentina** | 🔥 **Trending**
 
-⭐ Favoritas actuales: {num_favoritas}
-🎯 Mínimo requerido: 3
+⭐ **Favoritas actuales:** {num_favoritas}
+🎯 **Mínimo requerido:** 3
 
-💡 Presiona para agregar:""",
+💡 **Presiona para agregar:**""",
             reply_markup=crear_menu_sugerencias_setup(),
             parse_mode='Markdown'
         )
@@ -766,25 +774,25 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
             guardar_usuarios()
             
             await query.edit_message_text(
-                f"""✅ {ticker} agregada exitosamente
+                f"""✅ **{ticker} agregada exitosamente**
 
-⭐ Favoritas actuales: {len(favoritas_usuario)}
-📋 Lista: {', '.join(favoritas_usuario)}
+⭐ **Favoritas actuales:** {len(favoritas_usuario)}
+📋 **Lista:** {', '.join(favoritas_usuario)}
 
-🎯 Mínimo requerido: 3
+🎯 **Mínimo requerido:** 3
 
-💡 Continúa agregando:""",
+💡 **Continúa agregando:**""",
                 reply_markup=crear_menu_sugerencias_setup(),
                 parse_mode='Markdown'
             )
         else:
             await query.edit_message_text(
-                f"""⚠️ {ticker} ya está en tu lista
+                f"""⚠️ **{ticker} ya está en tu lista**
 
-⭐ Favoritas actuales: {len(favoritas_usuario)}
-📋 Lista: {', '.join(favoritas_usuario)}
+⭐ **Favoritas actuales:** {len(favoritas_usuario)}
+📋 **Lista:** {', '.join(favoritas_usuario)}
 
-💡 Elige otra acción:""",
+💡 **Elige otra acción:**""",
                 reply_markup=crear_menu_sugerencias_setup(),
                 parse_mode='Markdown'
             )
@@ -798,63 +806,56 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
             guardar_usuarios()
             
             await query.edit_message_text(
-                f"""🎉 ¡CONFIGURACIÓN COMPLETADA! 🎉
+                f"""🎉 **¡CONFIGURACIÓN COMPLETADA!** 🎉
 
-✅ Setup exitoso:
-• Acciones favoritas: {len(favoritas_usuario)}
-• Lista: {', '.join(favoritas_usuario)}
-• Alertas: 🔔 ACTIVAS (cada 15 minutos)
+✅ **Setup exitoso:**
+• **Acciones favoritas:** {len(favoritas_usuario)}
+• **Lista:** {', '.join(favoritas_usuario)}
+• **Alertas:** 🔔 ACTIVAS (cada 15 minutos)
 
-🚀 ¡El bot está listo para usar!
-👇 ACCEDE AL MENÚ PRINCIPAL 👇""",
+🚀 **¡El bot está listo para usar!**
+👇 **ACCEDE AL MENÚ PRINCIPAL** 👇""",
                 reply_markup=crear_menu_principal(),
                 parse_mode='Markdown'
             )
         else:
             await query.edit_message_text(
-                f"""⚠️ CONFIGURACIÓN INCOMPLETA
+                f"""⚠️ **CONFIGURACIÓN INCOMPLETA**
 
-❌ Tienes {len(favoritas_usuario)} favoritas
-🎯 Necesitas al menos 3
+❌ **Tienes {len(favoritas_usuario)} favoritas**
+🎯 **Necesitas al menos 3**
 
-💡 Agrega más acciones:""",
+💡 **Agrega más acciones:**""",
                 reply_markup=crear_menu_sugerencias_setup(),
                 parse_mode='Markdown'
             )
     
     elif query.data == "setup_manual":
         await query.edit_message_text(
-            """✍️ AGREGAR MANUALMENTE ✍️
+            """✍️ **AGREGAR MANUALMENTE** ✍️
 
-📝 Escribe el símbolo de la acción
+📝 **Escribe el símbolo de la acción**
 
-🔥 EJEMPLOS:
-• USA: AAPL, TSLA, MSFT, GOOGL, AMZN
-• Argentina: YPF, GGAL, BMA, PAMP
+🔥 **EJEMPLOS:**
+• **USA:** AAPL, TSLA, MSFT, GOOGL, AMZN
+• **Argentina:** YPF, GGAL, BMA, PAMP
 
-💡 Tips:
+💡 **Tips:**
 • Puedes escribir en minúsculas
 • Para Argentina: YPF o YPF.BA
 • Una acción por mensaje
 
-🎯 Escribe el ticker ahora:""",
+🎯 **Escribe el ticker ahora:**""",
+            parse_mode='Markdown',
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Volver", callback_data="setup_inicial")]])
         )
         
         context.user_data['modo'] = 'setup_manual'
     
-    # Verificar setup completo para acceso al menú principal
-    elif not usuarios_registrados[chat_id].get('setup_completo', False):
-        await query.edit_message_text(
-            "⚠️ CONFIGURACIÓN PENDIENTE ⚠️\n\n🎯 Necesitas completar tu setup inicial\n\n💡 Agrega tus acciones favoritas primero:",
-            reply_markup=crear_menu_setup_inicial(),
-            parse_mode='Markdown'
-        )
-    
-    # Resto del menú principal (solo si setup completo)
+    # --- NUEVOS BOTONES DEL MENÚ PRINCIPAL ---
     elif query.data == "menu":
         await query.edit_message_text(
-            "🤖 MENÚ PRINCIPAL 🤖\n\n🎯 ¿Qué análisis quieres hacer?\n👇 Selecciona una opción 👇",
+            "🤖 **MENÚ PRINCIPAL** 🤖\n\n🎯 **¿Qué análisis quieres hacer?**\n👇 **Selecciona una opción** 👇",
             reply_markup=crear_menu_principal(),
             parse_mode='Markdown'
         )
@@ -863,10 +864,10 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
         usuario_info = usuarios_registrados[chat_id]
         favoritas_usuario = usuario_info.get('acciones_favoritas', [])
         
-        favoritas_texto = f"⭐ MIS ACCIONES FAVORITAS ⭐\n\n🚨 Alertas inteligentes {'ACTIVAS' if usuario_info.get('alertas_activas', True) else 'DESACTIVADAS'}\n\n"
+        favoritas_texto = f"⭐ **MIS ACCIONES FAVORITAS** ⭐\n\n🚨 **Alertas inteligentes {'ACTIVAS' if usuario_info.get('alertas_activas', True) else 'DESACTIVADAS'}**\n\n"
         for i, accion in enumerate(favoritas_usuario, 1):
-            favoritas_texto += f"{i}. {accion}\n"
-        favoritas_texto += f"\n📊 Total: {len(favoritas_usuario)} acciones\n🎯 Presiona para análisis completo:"
+            favoritas_texto += f"{i}. **{accion}**\n"
+        favoritas_texto += f"\n📊 **Total: {len(favoritas_usuario)} acciones**\n🎯 **Presiona para análisis completo:**"
         
         keyboard = []
         for i in range(0, len(favoritas_usuario), 2):
@@ -886,7 +887,7 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif query.data.startswith("analizar_"):
         ticker = query.data.replace("analizar_", "")
-        await query.edit_message_text(f"🔍 Analizando {ticker}...\n⏳ Calculando indicadores y sugerencias...")
+        await query.edit_message_text(f"🔍 **Analizando {ticker}...**\n⏳ **Calculando indicadores y sugerencias...**", parse_mode='Markdown')
         
         respuesta, _, _ = analizar_accion_completa(ticker)
         
@@ -895,16 +896,46 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
             partes = [respuesta[i:i+4000] for i in range(0, len(respuesta), 4000)]
             for i, parte in enumerate(partes):
                 if i == 0:
-                    await query.edit_message_text(parte)
+                    await query.edit_message_text(parte, parse_mode='Markdown')
                 else:
-                    await context.bot.send_message(chat_id=query.message.chat_id, text=parte)
+                    await context.bot.send_message(chat_id=query.message.chat_id, text=parte, parse_mode='Markdown')
         else:
-            await query.edit_message_text(respuesta)
+            await query.edit_message_text(respuesta, parse_mode='Markdown')
         
         # Mostrar menú después del análisis
         await context.bot.send_message(
             chat_id=query.message.chat_id,
-            text="🎯 ¿Qué más quieres analizar?\n👇 Selecciona otra opción 👇",
+            text="🎯 **¿Qué más quieres analizar?**\n👇 **Selecciona otra opción** 👇",
+            reply_markup=crear_menu_principal(),
+            parse_mode='Markdown'
+        )
+    
+    elif query.data == "analizar_cualquier":
+        await query.edit_message_text(
+            """📝 **Escribe el símbolo de la acción que quieres analizar**
+
+🔥 **EJEMPLOS:**
+• **USA:** AAPL, TSLA, MSFT, GOOGL, AMZN
+• **Argentina:** YPF, GGAL, BMA, PAMP
+
+💡 **Tips:**
+• Puedes escribir en minúsculas
+• Para Argentina: YPF o YPF.BA
+• Una acción por mensaje
+
+🎯 **Escribe el ticker ahora:**""",
+            parse_mode='Markdown',
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Volver al Menú", callback_data="menu")]])
+        )
+        context.user_data['modo'] = 'analizar_cualquier' # Set mode for next message
+    
+    elif query.data == "top_10_dia":
+        await query.edit_message_text("📈 **Cargando Top 10 del Día...**\n⏳ **Esto puede tomar unos segundos...**", parse_mode='Markdown')
+        await enviar_top_10_dia(update, context)
+        # After sending the top 10, show the main menu again
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text="🎯 **¿Qué más quieres hacer?**\n👇 **Usa el menú para más opciones** 👇",
             reply_markup=crear_menu_principal(),
             parse_mode='Markdown'
         )
@@ -913,7 +944,7 @@ async def analizar_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.message.chat_id
     user = update.message.from_user
     
-    # Verificar si el usuario está registrado
+    # Registrar usuario si no existe
     if chat_id not in usuarios_registrados:
         registrar_usuario(
             chat_id=chat_id,
@@ -922,32 +953,27 @@ async def analizar_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
             last_name=user.last_name
         )
     
-    # Obtener input del usuario
     ticker_input = str(update.message.text).strip()
-    
-    # Verificar si está en modo setup manual
-    if context.user_data.get('modo') == 'setup_manual':
+    current_mode = context.user_data.get('modo')
+
+    if current_mode == 'setup_manual':
         usuario_info = usuarios_registrados[chat_id]
         favoritas_usuario = usuario_info.get('acciones_favoritas', [])
         
-        # Mostrar mensaje de búsqueda
         mensaje_busqueda = await update.message.reply_text(
             f"🔍 **Buscando '{ticker_input}'...**\n⏳ **Verificando en múltiples mercados...**",
             parse_mode='Markdown'
         )
         
-        # Validar ticker con sugerencias
         es_valido, ticker_encontrado, sugerencias = validar_ticker_con_sugerencias(ticker_input)
         
         if es_valido:
-            # Verificar que no esté ya en favoritas
             if ticker_encontrado in favoritas_usuario:
                 await mensaje_busqueda.edit_text(
                     f"⚠️ **{ticker_encontrado} ya está en tu lista**\n\n📋 **Favoritas actuales:** {', '.join(favoritas_usuario)}\n\n🎯 **Escribe otra acción:**",
                     parse_mode='Markdown'
                 )
             else:
-                # Agregar a favoritas
                 favoritas_usuario.append(ticker_encontrado)
                 usuarios_registrados[chat_id]['acciones_favoritas'] = favoritas_usuario
                 guardar_usuarios()
@@ -958,6 +984,9 @@ async def analizar_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 
                 if len(favoritas_usuario) >= 3:
+                    usuarios_registrados[chat_id]['setup_completo'] = True # Mark setup as complete
+                    guardar_usuarios()
+                    context.user_data['modo'] = None # Clear mode
                     await update.message.reply_text(
                         f"🎉 **¡Ya tienes {len(favoritas_usuario)} favoritas!**\n\n✅ **Puedes finalizar el setup o agregar más**",
                         reply_markup=InlineKeyboardMarkup([
@@ -973,14 +1002,11 @@ async def analizar_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         parse_mode='Markdown'
                     )
         else:
-            # Ticker no encontrado, mostrar sugerencias
             mensaje_error = f"❌ **No se encontraron datos para '{ticker_input}'**\n\n"
-            
             if sugerencias:
                 mensaje_error += f"💡 **¿Quisiste decir alguna de estas?**\n"
                 for sugerencia in sugerencias:
                     mensaje_error += f"• {sugerencia}\n"
-                mensaje_error += f"\n📝 **Escribe el símbolo correcto o prueba con:**\n"
             else:
                 mensaje_error += f"💡 **Verifica el símbolo e intenta de nuevo**\n\n"
             
@@ -994,51 +1020,77 @@ async def analizar_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             await mensaje_busqueda.edit_text(mensaje_error, parse_mode='Markdown')
         
-        context.user_data['modo'] = 'setup_manual'  # Mantener el modo activo
-    
-    else:
-        # Verificar setup completo
-        if not usuarios_registrados[chat_id].get('setup_completo', False):
-            await update.message.reply_text(
-                "⚠️ **CONFIGURACIÓN PENDIENTE**\n\n🎯 **Completa tu setup primero**",
-                reply_markup=crear_menu_setup_inicial(),
-                parse_mode='Markdown'
-            )
-            return
-        
-        # Análisis normal
+        # Keep mode if setup is not complete and ticker was invalid
+        if not usuarios_registrados[chat_id].get('setup_completo', False) and not es_valido:
+            context.user_data['modo'] = 'setup_manual'
+        elif usuarios_registrados[chat_id].get('setup_completo', False):
+            context.user_data['modo'] = None # Clear mode if setup is complete
+
+    elif current_mode == 'analizar_cualquier':
         mensaje_analisis = await update.message.reply_text(
             f"🔍 **Analizando '{ticker_input}'...**\n⏳ **Calculando indicadores y sugerencias...**", 
             parse_mode='Markdown'
         )
         
-        # Validar y analizar
         es_valido, ticker_encontrado, sugerencias = validar_ticker_con_sugerencias(ticker_input)
         
         if es_valido:
             respuesta, _, _ = analizar_accion_completa(ticker_encontrado)
-            await mensaje_analisis.edit_text(respuesta)
-            
-            # Mostrar menú después del análisis
-            await update.message.reply_text(
-                "🎯 **¿Qué más quieres hacer?**\n👇 **Usa el menú para más opciones** 👇",
-                reply_markup=crear_menu_principal(),
-                parse_mode='Markdown'
-            )
+            await mensaje_analisis.edit_text(respuesta, parse_mode='Markdown')
         else:
-            # Error en análisis
             mensaje_error = f"❌ **No se encontraron datos para '{ticker_input}'**\n\n"
-            
             if sugerencias:
                 mensaje_error += f"💡 **¿Quisiste decir alguna de estas?**\n"
                 for sugerencia in sugerencias:
                     mensaje_error += f"• {sugerencia}\n"
-            
             mensaje_error += f"\n🔥 **Prueba con estos populares:**\n"
             mensaje_error += f"• AAPL, TSLA, MSFT, GOOGL, AMZN\n"
             mensaje_error += f"• YPF, GGAL, BMA, PAMP"
-            
             await mensaje_analisis.edit_text(mensaje_error, parse_mode='Markdown')
+        
+        context.user_data['modo'] = None # Clear mode after analysis
+        
+        await update.message.reply_text(
+            "🎯 **¿Qué más quieres hacer?**\n👇 **Usa el menú para más opciones** 👇",
+            reply_markup=crear_menu_principal(),
+            parse_mode='Markdown'
+        )
+    
+    else: # Default behavior if no specific mode is set (e.g., user just types a ticker)
+        if not usuarios_registrados[chat_id].get('setup_completo', False):
+            await update.message.reply_text(
+                f"⚠️ **CONFIGURACIÓN PENDIENTE**\n\n🎯 **Completa tu setup primero**",
+                reply_markup=crear_menu_setup_inicial(),
+                parse_mode='Markdown'
+            )
+            return
+        
+        mensaje_analisis = await update.message.reply_text(
+            f"🔍 **Analizando '{ticker_input}'...**\n⏳ **Calculando indicadores y sugerencias...**", 
+            parse_mode='Markdown'
+        )
+        
+        es_valido, ticker_encontrado, sugerencias = validar_ticker_con_sugerencias(ticker_input)
+        
+        if es_valido:
+            respuesta, _, _ = analizar_accion_completa(ticker_encontrado)
+            await mensaje_analisis.edit_text(respuesta, parse_mode='Markdown')
+        else:
+            mensaje_error = f"❌ **No se encontraron datos para '{ticker_input}'**\n\n"
+            if sugerencias:
+                mensaje_error += f"💡 **¿Quisiste decir alguna de estas?**\n"
+                for sugerencia in sugerencias:
+                    mensaje_error += f"• {sugerencia}\n"
+            mensaje_error += f"\n🔥 **Prueba con estos populares:**\n"
+            mensaje_error += f"• AAPL, TSLA, MSFT, GOOGL, AMZN\n"
+            mensaje_error += f"• YPF, GGAL, BMA, PAMP"
+            await mensaje_analisis.edit_text(mensaje_error, parse_mode='Markdown')
+        
+        await update.message.reply_text(
+            "🎯 **¿Qué más quieres hacer?**\n👇 **Usa el menú para más opciones** 👇",
+            reply_markup=crear_menu_principal(),
+            parse_mode='Markdown'
+        )
 
 async def enviar_alertas(context: ContextTypes.DEFAULT_TYPE):
     """Envía alertas inteligentes comparando TODAS las favoritas y recomendando la mejor"""
@@ -1257,6 +1309,89 @@ def analizar_oportunidades_comparativas(analisis_completo):
     except Exception as e:
         print(f"❌ Error en análisis comparativo: {e}")
         return analisis_completo
+
+# New function for Top 10
+async def enviar_top_10_dia(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Obtiene y envía el Top 10 de acciones del día (USA y Argentina)"""
+    
+    # Curated list of popular and liquid stocks for Top 10
+    # This list can be expanded or dynamically fetched from a source if available
+    tickers_para_top_10 = [
+        "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "NFLX", "AMD", "JPM", # USA
+        "YPF.BA", "GGAL.BA", "BMA.BA", "PAMP.BA", "TXAR.BA", "ALUA.BA", "CEPU.BA", "LOMA.BA", # Argentina
+        "KO", "PEP", "V", "MA", "DIS", # More USA
+        "BBAR.BA", "CEPU.BA", "EDN.BA", # More Argentina
+    ]
+    
+    resultados_dia = []
+    
+    # Determine chat_id for sending messages
+    chat_id = None
+    if update.callback_query:
+        chat_id = update.callback_query.message.chat_id
+    elif update.message:
+        chat_id = update.message.chat_id
+    
+    if not chat_id:
+        print("❌ No se pudo determinar el chat_id para enviar el Top 10.")
+        return
+
+    # Send initial loading message
+    message_to_edit = None
+    if update.callback_query:
+        message_to_edit = update.callback_query.message
+    elif update.message:
+        message_to_edit = update.message
+    
+    if message_to_edit:
+        await message_to_edit.edit_text("📈 **Cargando Top 10 del Día...**\n⏳ **Esto puede tomar unos segundos...**", parse_mode='Markdown')
+
+    for ticker in tickers_para_top_10:
+        try:
+            df, ticker_usado = obtener_datos_accion(ticker)
+            if df is not None and len(df) >= 2:
+                precio_actual = float(df['Close'].iloc[-1])
+                precio_anterior = float(df['Close'].iloc[-2])
+                if precio_anterior != 0:
+                    cambio_porcentaje = ((precio_actual - precio_anterior) / precio_anterior) * 100
+                    resultados_dia.append({
+                        'ticker': ticker_usado,
+                        'precio': precio_actual,
+                        'cambio_pct': cambio_porcentaje
+                    })
+        except Exception as e:
+            print(f"❌ Error obteniendo datos para Top 10 de {ticker}: {e}")
+            continue
+            
+    if not resultados_dia:
+        await context.bot.send_message(
+            chat_id=chat_id, # Use chat_id directly
+            text="❌ **No se pudieron obtener datos para el Top 10 del Día en este momento.**\n\n💡 **Intenta de nuevo más tarde.**",
+            parse_mode='Markdown'
+        )
+        return
+
+    # Ordenar por cambio porcentual (mayor a menor)
+    top_10 = sorted(resultados_dia, key=lambda x: x['cambio_pct'], reverse=True)[:10]
+    
+    mensaje_top_10 = "📈 **TOP 10 ACCIONES DEL DÍA** 📈\n"
+    mensaje_top_10 += f"{'='*40}\n"
+    mensaje_top_10 += f"🕐 **Actualizado:** {datetime.now().strftime('%H:%M:%S')}\n\n"
+    
+    if top_10:
+        for i, accion in enumerate(top_10, 1):
+            emoji = "🟢" if accion['cambio_pct'] >= 0 else "🔴"
+            mensaje_top_10 += f"{i}. {emoji} **{accion['ticker']}:** ${accion['precio']:.2f} ({accion['cambio_pct']:+.2f}%)\n"
+    else:
+        mensaje_top_10 += "No hay acciones disponibles para mostrar en el Top 10."
+        
+    mensaje_top_10 += f"\n⚠️ **Recuerda:** Este análisis es educativo, no consejo financiero."
+    
+    await context.bot.send_message(
+        chat_id=chat_id, # Use chat_id directly
+        text=mensaje_top_10,
+        parse_mode='Markdown'
+    )
 
 # --- INICIO DEL BOT ---
 if __name__ == '__main__':
