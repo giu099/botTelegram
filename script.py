@@ -98,15 +98,74 @@ def crear_menu_principal():
     return InlineKeyboardMarkup(keyboard)
 
 def crear_menu_setup_inicial():
-    """Menú para el setup inicial obligatorio"""
+    """Menú para el setup inicial obligatorio con nuevas opciones"""
     keyboard = [
         [
-            InlineKeyboardButton("🇺🇸 Acciones USA Populares", callback_data="setup_usa"),
-            InlineKeyboardButton("🇦🇷 Acciones Argentinas", callback_data="setup_argentinas")
+            InlineKeyboardButton("🇺🇸 Top USA Populares", callback_data="setup_top_usa"),
+            InlineKeyboardButton("🇦🇷 Top Argentina Populares", callback_data="setup_top_argentina")
         ],
         [
-            InlineKeyboardButton("✍️ Escribir Manualmente", callback_data="setup_manual"),
-            InlineKeyboardButton("🔥 Sugerencias Top", callback_data="setup_sugerencias")
+            InlineKeyboardButton("✍️ Escribir Manualmente", callback_data="setup_manual")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def crear_menu_top_usa_acciones():
+    """Menú con una selección de acciones USA populares para setup inicial"""
+    keyboard = [
+        [
+            InlineKeyboardButton("🟢 AAPL (Apple)", callback_data="add_setup_AAPL"),
+            InlineKeyboardButton("🟢 MSFT (Microsoft)", callback_data="add_setup_MSFT")
+        ],
+        [
+            InlineKeyboardButton("🟢 GOOGL (Alphabet)", callback_data="add_setup_GOOGL"),
+            InlineKeyboardButton("🟢 AMZN (Amazon)", callback_data="add_setup_AMZN")
+        ],
+        [
+            InlineKeyboardButton("🟢 NVDA (Nvidia)", callback_data="add_setup_NVDA"),
+            InlineKeyboardButton("🟢 TSLA (Tesla)", callback_data="add_setup_TSLA")
+        ],
+        [
+            InlineKeyboardButton("🟢 META (Meta Platforms)", callback_data="add_setup_META"),
+            InlineKeyboardButton("🟢 JPM (JPMorgan Chase)", callback_data="add_setup_JPM")
+        ],
+        [
+            InlineKeyboardButton("🟢 V (Visa)", callback_data="add_setup_V"),
+            InlineKeyboardButton("🟢 UNH (UnitedHealth)", callback_data="add_setup_UNH")
+        ],
+        [
+            InlineKeyboardButton("✅ Terminar Setup", callback_data="finalizar_setup"),
+            InlineKeyboardButton("🔙 Volver", callback_data="setup_inicial")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def crear_menu_top_argentina_acciones():
+    """Menú con una selección de acciones argentinas populares para setup inicial"""
+    keyboard = [
+        [
+            InlineKeyboardButton("🔵 YPF (YPF)", callback_data="add_setup_YPF"),
+            InlineKeyboardButton("🔵 GGAL (Galicia)", callback_data="add_setup_GGAL")
+        ],
+        [
+            InlineKeyboardButton("🔵 BMA (Macro)", callback_data="add_setup_BMA"),
+            InlineKeyboardButton("🔵 PAMP (Pampa Energía)", callback_data="add_setup_PAMP")
+        ],
+        [
+            InlineKeyboardButton("🔵 TXAR (Ternium)", callback_data="add_setup_TXAR"),
+            InlineKeyboardButton("🔵 ALUA (Aluar)", callback_data="add_setup_ALUA")
+        ],
+        [
+            InlineKeyboardButton("🔵 CEPU (Central Puerto)", callback_data="add_setup_CEPU"),
+            InlineKeyboardButton("🔵 LOMA (Loma Negra)", callback_data="add_setup_LOMA")
+        ],
+        [
+            InlineKeyboardButton("🔵 TRAN (Transener)", callback_data="add_setup_TRAN"),
+            InlineKeyboardButton("🔵 EDN (Edenor)", callback_data="add_setup_EDN")
+        ],
+        [
+            InlineKeyboardButton("✅ Terminar Setup", callback_data="finalizar_setup"),
+            InlineKeyboardButton("🔙 Volver", callback_data="setup_inicial")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -724,7 +783,7 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Las acciones de setup (setup_inicial, setup_sugerencias, add_setup_, finalizar_setup, setup_manual)
     # son las únicas permitidas si el setup no está completo.
     if not usuarios_registrados[chat_id].get('setup_completo', False) and \
-       query.data not in ["setup_inicial", "setup_sugerencias", "finalizar_setup", "setup_manual"] and \
+       query.data not in ["setup_inicial", "setup_sugerencias", "finalizar_setup", "setup_manual", "setup_top_usa", "setup_top_argentina"] and \
        not query.data.startswith("add_setup_"):
         await query.edit_message_text(
             f"⚠️ **CONFIGURACIÓN PENDIENTE** ⚠️\n\n🎯 **Necesitas completar tu setup inicial**\n\n💡 **Agrega tus acciones favoritas primero:**",
@@ -851,6 +910,38 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
         context.user_data['modo'] = 'setup_manual'
+    
+    elif query.data == "setup_top_usa":
+        usuario_info = usuarios_registrados[chat_id]
+        num_favoritas = len(usuario_info.get('acciones_favoritas', []))
+        await query.edit_message_text(
+            f"""🇺🇸 **TOP ACCIONES USA POPULARES** 🇺🇸
+
+📊 **Selecciona para agregar a tus favoritas**
+
+⭐ **Favoritas actuales:** {num_favoritas}
+🎯 **Mínimo requerido:** 3
+
+💡 **Presiona para agregar:**""",
+            reply_markup=crear_menu_top_usa_acciones(),
+            parse_mode='Markdown'
+        )
+
+    elif query.data == "setup_top_argentina":
+        usuario_info = usuarios_registrados[chat_id]
+        num_favoritas = len(usuario_info.get('acciones_favoritas', []))
+        await query.edit_message_text(
+            f"""🇦🇷 **TOP ACCIONES ARGENTINA POPULARES** 🇦🇷
+
+📊 **Selecciona para agregar a tus favoritas**
+
+⭐ **Favoritas actuales:** {num_favoritas}
+🎯 **Mínimo requerido:** 3
+
+💡 **Presiona para agregar:**""",
+            reply_markup=crear_menu_top_argentina_acciones(),
+            parse_mode='Markdown'
+        )
     
     # --- NUEVOS BOTONES DEL MENÚ PRINCIPAL ---
     elif query.data == "menu":
