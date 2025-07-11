@@ -9,6 +9,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import json
 import os
+import pytz # Import pytz for timezone handling
 
 # --- CONFIGURACIÓN ---
 TOKEN = "7992552839:AAEA54Yi1MIS1Wfrq0xkFL0E-LgW3rMbyqo"
@@ -36,7 +37,41 @@ TICKERS_ARGENTINOS = {
     "CEPU": ["CEPU", "CEPU.BA"],
     "COME": ["COME", "COME.BA"],
     "BYMA": ["BYMA", "BYMA.BA"],
+    "VALO": ["VALO", "VALO.BA"],
+    "BBAR": ["BBAR", "BBAR.BA"],
+    "EDN": ["EDN", "EDN.BA"],
+    "TGNO4": ["TGNO4", "TGNO4.BA"],
+    "CADO": ["CADO", "CADO.BA"],
+    "DGCU2": ["DGCU2", "DGCU2.BA"],
+    "FERR": ["FERR", "FERR.BA"],
+    "INTR": ["INTR", "INTR.BA"],
+    "LEDE": ["LEDE", "LEDE.BA"],
+    "MOLI": ["MOLI", "MOLI.BA"],
+    "SEMI": ["SEMI", "SEMI.BA"],
+    "SAMI": ["SAMI", "SAMI.BA"],
+    "SUPV": ["SUPV", "SUPV.BA"],
+    "TGS": ["TGS", "TGS.BA"],
+    "YPFD": ["YPFD", "YPFD.BA"],
 }
+
+# Listas curadas de acciones populares para los menús de 50 "mejores"
+# Nota: Se proporciona una selección representativa en lugar de 50 botones por limitaciones de UI.
+TOP_USA_STOCKS_CURATED = [
+    "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "NFLX", "AMD", "JPM",
+    "V", "UNH", "BRK-B", "LLY", "XOM", "JNJ", "PG", "MA", "HD", "CVX",
+    "MRK", "ABBV", "KO", "PEP", "COST", "ADBE", "CRM", "CSCO", "TMO", "ACN",
+    "ORCL", "CMCSA", "VZ", "DIS", "NKE", "INTC", "QCOM", "SBUX", "BA", "GE",
+    "IBM", "GS", "MS", "CAT", "DE", "MMM", "HON", "RTX", "LMT", "GD"
+]
+
+TOP_ARGENTINA_STOCKS_CURATED = [
+    "YPF", "GGAL", "BMA", "PAMP", "TXAR", "ALUA", "TECO2", "MIRG", "SUPV", "CRES",
+    "TRAN", "LOMA", "CEPU", "COME", "BYMA", "VALO", "BBAR", "EDN", "TGNO4", "CADO",
+    "DGCU2", "FERR", "INTR", "LEDE", "MOLI", "SEMI", "SAMI", "TGS", "YPFD", "CECO2",
+    "DICA", "AUSO", "BHIP", "BOLT", "CAME", "CAPX", "CARC", "CELU", "CTIO", "DOME",
+    "FIPL", "GAMI", "GARO", "HAVA", "INVJ", "JUAR", "LONG", "METR", "MERA", "MORI"
+]
+
 
 def cargar_usuarios():
     """Carga la lista de usuarios registrados desde archivo"""
@@ -83,16 +118,19 @@ def registrar_usuario(chat_id, username, first_name, last_name=None):
     return True
 
 def crear_menu_principal():
-    """Crea el menú principal con 3 botones principales"""
+    """Crea el menú principal con 4 botones principales"""
     keyboard = [
-        [
-            InlineKeyboardButton("⭐ Mis Favoritas", callback_data="favoritas")
-        ],
         [
             InlineKeyboardButton("📊 Analizar Cualquier Acción", callback_data="analizar_cualquier")
         ],
         [
-            InlineKeyboardButton("📈 Top 10 del Día", callback_data="top_10_dia")
+            InlineKeyboardButton("⭐ Mis Favoritas", callback_data="favoritas")
+        ],
+        [
+            InlineKeyboardButton("🇺🇸 Resumen del Día (USA)", callback_data="resumen_usa_dia")
+        ],
+        [
+            InlineKeyboardButton("🚨 Alertas Inteligentes", callback_data="alertas_inteligentes")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -110,68 +148,68 @@ def crear_menu_setup_inicial():
     ]
     return InlineKeyboardMarkup(keyboard)
 
-def crear_menu_top_usa_acciones():
-    """Menú con una selección de acciones USA populares para setup inicial"""
-    keyboard = [
-        [
-            InlineKeyboardButton("🟢 AAPL (Apple)", callback_data="add_setup_AAPL"),
-            InlineKeyboardButton("🟢 MSFT (Microsoft)", callback_data="add_setup_MSFT")
-        ],
-        [
-            InlineKeyboardButton("🟢 GOOGL (Alphabet)", callback_data="add_setup_GOOGL"),
-            InlineKeyboardButton("🟢 AMZN (Amazon)", callback_data="add_setup_AMZN")
-        ],
-        [
-            InlineKeyboardButton("🟢 NVDA (Nvidia)", callback_data="add_setup_NVDA"),
-            InlineKeyboardButton("🟢 TSLA (Tesla)", callback_data="add_setup_TSLA")
-        ],
-        [
-            InlineKeyboardButton("🟢 META (Meta Platforms)", callback_data="add_setup_META"),
-            InlineKeyboardButton("🟢 JPM (JPMorgan Chase)", callback_data="add_setup_JPM")
-        ],
-        [
-            InlineKeyboardButton("🟢 V (Visa)", callback_data="add_setup_V"),
-            InlineKeyboardButton("🟢 UNH (UnitedHealth)", callback_data="add_setup_UNH")
-        ],
-        [
-            InlineKeyboardButton("✅ Terminar Setup", callback_data="finalizar_setup"),
-            InlineKeyboardButton("🔙 Volver", callback_data="setup_inicial")
-        ]
-    ]
+def crear_menu_top_usa_acciones(page=0, page_size=10):
+    """Menú con una selección de acciones USA populares para setup inicial, con paginación"""
+    start_index = page * page_size
+    end_index = start_index + page_size
+    current_stocks = TOP_USA_STOCKS_CURATED[start_index:end_index]
+    
+    keyboard = []
+    for i in range(0, len(current_stocks), 2):
+        row = []
+        for j in range(2):
+            if i + j < len(current_stocks):
+                ticker = current_stocks[i + j]
+                row.append(InlineKeyboardButton(f"🟢 {ticker}", callback_data=f"add_setup_{ticker}"))
+        keyboard.append(row)
+    
+    # Pagination buttons
+    nav_row = []
+    if page > 0:
+        nav_row.append(InlineKeyboardButton("⬅️ Anterior", callback_data=f"page_usa_{page-1}"))
+    if end_index < len(TOP_USA_STOCKS_CURATED):
+        nav_row.append(InlineKeyboardButton("Siguiente ➡️", callback_data=f"page_usa_{page+1}"))
+    if nav_row:
+        keyboard.append(nav_row)
+
+    keyboard.append([
+        InlineKeyboardButton("✅ Terminar Setup", callback_data="finalizar_setup"),
+        InlineKeyboardButton("🔙 Volver", callback_data="setup_inicial")
+    ])
     return InlineKeyboardMarkup(keyboard)
 
-def crear_menu_top_argentina_acciones():
-    """Menú con una selección de acciones argentinas populares para setup inicial"""
-    keyboard = [
-        [
-            InlineKeyboardButton("🔵 YPF (YPF)", callback_data="add_setup_YPF"),
-            InlineKeyboardButton("🔵 GGAL (Galicia)", callback_data="add_setup_GGAL")
-        ],
-        [
-            InlineKeyboardButton("🔵 BMA (Macro)", callback_data="add_setup_BMA"),
-            InlineKeyboardButton("🔵 PAMP (Pampa Energía)", callback_data="add_setup_PAMP")
-        ],
-        [
-            InlineKeyboardButton("🔵 TXAR (Ternium)", callback_data="add_setup_TXAR"),
-            InlineKeyboardButton("🔵 ALUA (Aluar)", callback_data="add_setup_ALUA")
-        ],
-        [
-            InlineKeyboardButton("🔵 CEPU (Central Puerto)", callback_data="add_setup_CEPU"),
-            InlineKeyboardButton("🔵 LOMA (Loma Negra)", callback_data="add_setup_LOMA")
-        ],
-        [
-            InlineKeyboardButton("🔵 TRAN (Transener)", callback_data="add_setup_TRAN"),
-            InlineKeyboardButton("🔵 EDN (Edenor)", callback_data="add_setup_EDN")
-        ],
-        [
-            InlineKeyboardButton("✅ Terminar Setup", callback_data="finalizar_setup"),
-            InlineKeyboardButton("🔙 Volver", callback_data="setup_inicial")
-        ]
-    ]
+def crear_menu_top_argentina_acciones(page=0, page_size=10):
+    """Menú con una selección de acciones argentinas populares para setup inicial, con paginación"""
+    start_index = page * page_size
+    end_index = start_index + page_size
+    current_stocks = TOP_ARGENTINA_STOCKS_CURATED[start_index:end_index]
+
+    keyboard = []
+    for i in range(0, len(current_stocks), 2):
+        row = []
+        for j in range(2):
+            if i + j < len(current_stocks):
+                ticker = current_stocks[i + j]
+                row.append(InlineKeyboardButton(f"🔵 {ticker}", callback_data=f"add_setup_{ticker}"))
+        keyboard.append(row)
+
+    # Pagination buttons
+    nav_row = []
+    if page > 0:
+        nav_row.append(InlineKeyboardButton("⬅️ Anterior", callback_data=f"page_argentina_{page-1}"))
+    if end_index < len(TOP_ARGENTINA_STOCKS_CURATED):
+        nav_row.append(InlineKeyboardButton("Siguiente ➡️", callback_data=f"page_argentina_{page+1}"))
+    if nav_row:
+        keyboard.append(nav_row)
+
+    keyboard.append([
+        InlineKeyboardButton("✅ Terminar Setup", callback_data="finalizar_setup"),
+        InlineKeyboardButton("🔙 Volver", callback_data="setup_inicial")
+    ])
     return InlineKeyboardMarkup(keyboard)
 
 def crear_menu_sugerencias_setup():
-    """Menú con sugerencias para setup inicial"""
+    """Menú con sugerencias para setup inicial (manteniendo la estructura anterior si se desea)"""
     keyboard = [
         [
             InlineKeyboardButton("🟢 AAPL", callback_data="add_setup_AAPL"),
@@ -186,7 +224,7 @@ def crear_menu_sugerencias_setup():
         [
             InlineKeyboardButton("🔥 NVDA", callback_data="add_setup_NVDA"),
             InlineKeyboardButton("🔥 GOOGL", callback_data="add_setup_GOOGL"),
-            InlineKeyboardButton("🔥 META", callback_data="add_setup_META")
+            "🔥 META", "🔥 GOOGL", "🔥 META"
         ],
         [
             InlineKeyboardButton("✅ Terminar Setup", callback_data="finalizar_setup"),
@@ -686,7 +724,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             last_name=user.last_name
         )
         
-        # MENSAJE EXPLICATIVO OBLIGATORIO
+        # MENSAJE EXPLICATIVO OBLIGATORIO (del screenshot)
         mensaje_explicativo = f"""🚀 **¡BIENVENIDO {user.first_name.upper()} AL BOT DE ANÁLISIS TÉCNICO!** 🚀
 
 🤖 **¿QUÉ HACE ESTE BOT?**
@@ -780,11 +818,13 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     
     # Verificar si el setup está completo antes de permitir acceso a funciones principales
-    # Las acciones de setup (setup_inicial, setup_sugerencias, add_setup_, finalizar_setup, setup_manual)
+    # Las acciones de setup (setup_inicial, setup_sugerencias, add_setup_, finalizar_setup, setup_manual, setup_top_usa, setup_top_argentina, page_usa_, page_argentina_)
     # son las únicas permitidas si el setup no está completo.
     if not usuarios_registrados[chat_id].get('setup_completo', False) and \
        query.data not in ["setup_inicial", "setup_sugerencias", "finalizar_setup", "setup_manual", "setup_top_usa", "setup_top_argentina"] and \
-       not query.data.startswith("add_setup_"):
+       not query.data.startswith("add_setup_") and \
+       not query.data.startswith("page_usa_") and \
+       not query.data.startswith("page_argentina_"):
         await query.edit_message_text(
             f"⚠️ **CONFIGURACIÓN PENDIENTE** ⚠️\n\n🎯 **Necesitas completar tu setup inicial**\n\n💡 **Agrega tus acciones favoritas primero:**",
             reply_markup=crear_menu_setup_inicial(),
@@ -804,7 +844,7 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='Markdown'
         )
     
-    elif query.data == "setup_sugerencias":
+    elif query.data == "setup_sugerencias": # Mantener por si se quiere usar en el futuro, aunque los nuevos top lo reemplazan
         usuario_info = usuarios_registrados[chat_id]
         num_favoritas = len(usuario_info.get('acciones_favoritas', []))
         
@@ -841,7 +881,7 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🎯 **Mínimo requerido:** 3
 
 💡 **Continúa agregando:**""",
-                reply_markup=crear_menu_sugerencias_setup(),
+                reply_markup=query.message.reply_markup, # Keep the current menu (e.g., top USA/Argentina)
                 parse_mode='Markdown'
             )
         else:
@@ -852,7 +892,7 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
 📋 **Lista:** {', '.join(favoritas_usuario)}
 
 💡 **Elige otra acción:**""",
-                reply_markup=crear_menu_sugerencias_setup(),
+                reply_markup=query.message.reply_markup, # Keep the current menu
                 parse_mode='Markdown'
             )
     
@@ -885,7 +925,7 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🎯 **Necesitas al menos 3**
 
 💡 **Agrega más acciones:**""",
-                reply_markup=crear_menu_sugerencias_setup(),
+                reply_markup=crear_menu_setup_inicial(), # Volver al menú inicial de setup
                 parse_mode='Markdown'
             )
     
@@ -923,7 +963,24 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🎯 **Mínimo requerido:** 3
 
 💡 **Presiona para agregar:**""",
-            reply_markup=crear_menu_top_usa_acciones(),
+            reply_markup=crear_menu_top_usa_acciones(page=0),
+            parse_mode='Markdown'
+        )
+
+    elif query.data.startswith("page_usa_"):
+        page = int(query.data.replace("page_usa_", ""))
+        usuario_info = usuarios_registrados[chat_id]
+        num_favoritas = len(usuario_info.get('acciones_favoritas', []))
+        await query.edit_message_text(
+            f"""🇺🇸 **TOP ACCIONES USA POPULARES** 🇺🇸
+
+📊 **Selecciona para agregar a tus favoritas**
+
+⭐ **Favoritas actuales:** {num_favoritas}
+🎯 **Mínimo requerido:** 3
+
+💡 **Presiona para agregar:**""",
+            reply_markup=crear_menu_top_usa_acciones(page=page),
             parse_mode='Markdown'
         )
 
@@ -939,7 +996,24 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🎯 **Mínimo requerido:** 3
 
 💡 **Presiona para agregar:**""",
-            reply_markup=crear_menu_top_argentina_acciones(),
+            reply_markup=crear_menu_top_argentina_acciones(page=0),
+            parse_mode='Markdown'
+        )
+
+    elif query.data.startswith("page_argentina_"):
+        page = int(query.data.replace("page_argentina_", ""))
+        usuario_info = usuarios_registrados[chat_id]
+        num_favoritas = len(usuario_info.get('acciones_favoritas', []))
+        await query.edit_message_text(
+            f"""🇦🇷 **TOP ACCIONES ARGENTINA POPULARES** 🇦🇷
+
+📊 **Selecciona para agregar a tus favoritas**
+
+⭐ **Favoritas actuales:** {num_favoritas}
+🎯 **Mínimo requerido:** 3
+
+💡 **Presiona para agregar:**""",
+            reply_markup=crear_menu_top_argentina_acciones(page=page),
             parse_mode='Markdown'
         )
     
@@ -956,25 +1030,32 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
         favoritas_usuario = usuario_info.get('acciones_favoritas', [])
         
         favoritas_texto = f"⭐ **MIS ACCIONES FAVORITAS** ⭐\n\n🚨 **Alertas inteligentes {'ACTIVAS' if usuario_info.get('alertas_activas', True) else 'DESACTIVADAS'}**\n\n"
-        for i, accion in enumerate(favoritas_usuario, 1):
-            favoritas_texto += f"{i}. **{accion}**\n"
-        favoritas_texto += f"\n📊 **Total: {len(favoritas_usuario)} acciones**\n🎯 **Presiona para análisis completo:**"
-        
-        keyboard = []
-        for i in range(0, len(favoritas_usuario), 2):
-            row = []
-            for j in range(2):
-                if i + j < len(favoritas_usuario):
-                    accion = favoritas_usuario[i + j]
-                    row.append(InlineKeyboardButton(f"📊 {accion}", callback_data=f"analizar_{accion}"))
-            keyboard.append(row)
-        keyboard.append([InlineKeyboardButton("🔙 Volver al Menú", callback_data="menu")])
-        
-        await query.edit_message_text(
-            favoritas_texto,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode='Markdown'
-        )
+        if favoritas_usuario:
+            for i, accion in enumerate(favoritas_usuario, 1):
+                favoritas_texto += f"{i}. **{accion}**\n"
+            favoritas_texto += f"\n📊 **Total: {len(favoritas_usuario)} acciones**\n🎯 **Presiona para análisis completo:**"
+            
+            keyboard = []
+            for i in range(0, len(favoritas_usuario), 2):
+                row = []
+                for j in range(2):
+                    if i + j < len(favoritas_usuario):
+                        accion = favoritas_usuario[i + j]
+                        row.append(InlineKeyboardButton(f"📊 {accion}", callback_data=f"analizar_{accion}"))
+                keyboard.append(row)
+            keyboard.append([InlineKeyboardButton("🔙 Volver al Menú", callback_data="menu")])
+            
+            await query.edit_message_text(
+                favoritas_texto,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+        else:
+            await query.edit_message_text(
+                "⭐ **MIS ACCIONES FAVORITAS** ⭐\n\n❌ **Aún no tienes acciones favoritas.**\n\n💡 **Agrégalas desde el menú de configuración o usa 'Analizar Cualquier Acción'.**",
+                reply_markup=crear_menu_principal(),
+                parse_mode='Markdown'
+            )
     
     elif query.data.startswith("analizar_"):
         ticker = query.data.replace("analizar_", "")
@@ -993,11 +1074,21 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await query.edit_message_text(respuesta, parse_mode='Markdown')
         
+        # Check if the stock is already a favorite
+        usuario_info = usuarios_registrados[chat_id]
+        favoritas_usuario = usuario_info.get('acciones_favoritas', [])
+        
+        action_keyboard = []
+        if ticker not in favoritas_usuario:
+            action_keyboard.append([InlineKeyboardButton(f"⭐ Añadir {ticker} a Favoritas", callback_data=f"add_favorite_{ticker}")])
+        
+        action_keyboard.append([InlineKeyboardButton("🔙 Volver al Menú Principal", callback_data="menu")])
+
         # Mostrar menú después del análisis
         await context.bot.send_message(
             chat_id=query.message.chat_id,
             text="🎯 **¿Qué más quieres analizar?**\n👇 **Selecciona otra opción** 👇",
-            reply_markup=crear_menu_principal(),
+            reply_markup=InlineKeyboardMarkup(action_keyboard),
             parse_mode='Markdown'
         )
     
@@ -1021,12 +1112,58 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         context.user_data['modo'] = 'analizar_cualquier' # Se establece el modo para el siguiente mensaje
     
-    elif query.data == "top_10_dia":
-        await query.edit_message_text("📈 **Cargando Top 10 del Día...**\n⏳ **Esto puede tomar unos segundos...**", parse_mode='Markdown')
-        await enviar_top_10_dia(update, context)
-        # After sending the top 10, show the main menu again
+    elif query.data == "resumen_usa_dia":
+        await query.edit_message_text("📈 **Cargando Resumen del Día (USA)...**\n⏳ **Esto puede tomar unos segundos...**", parse_mode='Markdown')
+        await enviar_resumen_usa_dia(update, context)
+        # Mostrar menú después del resumen
         await context.bot.send_message(
             chat_id=query.message.chat_id,
+            text="🎯 **¿Qué más quieres hacer?**\n👇 **Usa el menú para más opciones** 👇",
+            reply_markup=crear_menu_principal(),
+            parse_mode='Markdown'
+        )
+
+    elif query.data == "alertas_inteligentes":
+        await query.edit_message_text("🚨 **Generando Resumen de Alertas Inteligentes...**\n⏳ **Esto puede tomar unos segundos...**", parse_mode='Markdown')
+        await enviar_alertas(context) # Llama a la función existente de alertas
+        # Mostrar menú después de las alertas
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text="🎯 **¿Qué más quieres hacer?**\n👇 **Usa el menú para más opciones** 👇",
+            reply_markup=crear_menu_principal(),
+            parse_mode='Markdown'
+        )
+
+    elif query.data.startswith("add_favorite_"):
+        ticker = query.data.replace("add_favorite_", "")
+        usuario_info = usuarios_registrados[chat_id]
+        favoritas_usuario = usuario_info.get('acciones_favoritas', [])
+
+        if ticker not in favoritas_usuario:
+            favoritas_usuario.append(ticker)
+            usuarios_registrados[chat_id]['acciones_favoritas'] = favoritas_usuario
+            
+            # Check if setup is now complete
+            if not usuario_info.get('setup_completo', False) and len(favoritas_usuario) >= 3:
+                usuarios_registrados[chat_id]['setup_completo'] = True
+                await query.edit_message_text(
+                    f"🎉 **¡Felicidades! {ticker} agregada a tus favoritas.**\n\n✅ **Tu configuración inicial está completa.**\n\n🚀 **¡El bot está listo para usar!**",
+                    parse_mode='Markdown'
+                )
+            else:
+                await query.edit_message_text(
+                    f"✅ **{ticker} ha sido añadida a tus acciones favoritas.**\n\n⭐ **Total de favoritas:** {len(favoritas_usuario)}",
+                    parse_mode='Markdown'
+                )
+            guardar_usuarios()
+        else:
+            await query.edit_message_text(
+                f"⚠️ **{ticker} ya está en tu lista de favoritas.**",
+                parse_mode='Markdown'
+            )
+        
+        await context.bot.send_message(
+            chat_id=chat_id,
             text="🎯 **¿Qué más quieres hacer?**\n👇 **Usa el menú para más opciones** 👇",
             reply_markup=crear_menu_principal(),
             parse_mode='Markdown'
@@ -1083,7 +1220,7 @@ async def analizar_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         f"🎉 **¡Ya tienes {len(favoritas_usuario)} favoritas!**\n\n✅ **Puedes finalizar el setup o agregar más**",
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton("✅ Finalizar Setup", callback_data="finalizar_setup")],
-                            [InlineKeyboardButton("➕ Agregar Más", callback_data="setup_sugerencias")]
+                            [InlineKeyboardButton("➕ Agregar Más", callback_data="setup_inicial")] # Volver al menú inicial de setup
                         ]),
                         parse_mode='Markdown'
                     )
@@ -1130,6 +1267,23 @@ async def analizar_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if es_valido:
             respuesta, _, _ = analizar_accion_completa(ticker_encontrado)
             await mensaje_analisis.edit_text(respuesta, parse_mode='Markdown')
+
+            # Check if the stock is already a favorite
+            usuario_info = usuarios_registrados[chat_id]
+            favoritas_usuario = usuario_info.get('acciones_favoritas', [])
+            
+            action_keyboard = []
+            if ticker_encontrado not in favoritas_usuario:
+                action_keyboard.append([InlineKeyboardButton(f"⭐ Añadir {ticker_encontrado} a Favoritas", callback_data=f"add_favorite_{ticker_encontrado}")])
+            
+            action_keyboard.append([InlineKeyboardButton("🔙 Volver al Menú Principal", callback_data="menu")])
+
+            await update.message.reply_text(
+                "🎯 **¿Qué más quieres hacer?**\n👇 **Usa el menú para más opciones** 👇",
+                reply_markup=InlineKeyboardMarkup(action_keyboard),
+                parse_mode='Markdown'
+            )
+
         else:
             mensaje_error = f"❌ **No se encontraron datos para '{ticker_input}'**\n\n"
             if sugerencias:
@@ -1140,15 +1294,15 @@ async def analizar_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
             mensaje_error += f"• AAPL, TSLA, MSFT, GOOGL, AMZN\n"
             mensaje_error += f"• YPF, GGAL, BMA, PAMP"
             await mensaje_analisis.edit_text(mensaje_error, parse_mode='Markdown')
+            
+            await update.message.reply_text(
+                "🎯 **¿Qué más quieres hacer?**\n👇 **Usa el menú para más opciones** 👇",
+                reply_markup=crear_menu_principal(),
+                parse_mode='Markdown'
+            )
         
         context.user_data['modo'] = None # Se limpia el modo después del análisis
         
-        await update.message.reply_text(
-            "🎯 **¿Qué más quieres hacer?**\n👇 **Usa el menú para más opciones** 👇",
-            reply_markup=crear_menu_principal(),
-            parse_mode='Markdown'
-        )
-    
     else: # Default behavior if no specific mode is set (e.g., user just types a ticker)
         # Check if setup is complete first
         if not usuarios_registrados[chat_id].get('setup_completo', False):
@@ -1188,6 +1342,19 @@ async def analizar_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Send analysis as a new message to avoid editing the "added to favorites" message
             await context.bot.send_message(chat_id=chat_id, text=respuesta, parse_mode='Markdown')
 
+            # Check if the stock is already a favorite (again, for the final menu)
+            action_keyboard = []
+            if ticker_encontrado not in favoritas_usuario: # This check is technically redundant here if it was just added, but good for consistency
+                action_keyboard.append([InlineKeyboardButton(f"⭐ Añadir {ticker_encontrado} a Favoritas", callback_data=f"add_favorite_{ticker_encontrado}")])
+            
+            action_keyboard.append([InlineKeyboardButton("🔙 Volver al Menú Principal", callback_data="menu")])
+
+            await update.message.reply_text(
+                "🎯 **¿Qué más quieres hacer?**\n👇 **Usa el menú para más opciones** 👇",
+                reply_markup=InlineKeyboardMarkup(action_keyboard),
+                parse_mode='Markdown'
+            )
+
         else:
             mensaje_error = f"❌ **No se encontraron datos para '{ticker_input}'**\n\n"
             if sugerencias:
@@ -1199,11 +1366,11 @@ async def analizar_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
             mensaje_error += f"• YPF, GGAL, BMA, PAMP"
             await mensaje_analisis.edit_text(mensaje_error, parse_mode='Markdown')
 
-        await update.message.reply_text(
-            "🎯 **¿Qué más quieres hacer?**\n👇 **Usa el menú para más opciones** 👇",
-            reply_markup=crear_menu_principal(),
-            parse_mode='Markdown'
-        )
+            await update.message.reply_text(
+                "🎯 **¿Qué más quieres hacer?**\n👇 **Usa el menú para más opciones** 👇",
+                reply_markup=crear_menu_principal(),
+                parse_mode='Markdown'
+            )
 
 async def enviar_alertas(context: ContextTypes.DEFAULT_TYPE):
     """Envía alertas inteligentes comparando TODAS las favoritas y recomendando la mejor"""
@@ -1423,22 +1590,123 @@ def analizar_oportunidades_comparativas(analisis_completo):
         print(f"❌ Error en análisis comparativo: {e}")
         return analisis_completo
 
-# New function for Top 10
+# New function for Top 10 (now used for Resumen del Día USA)
+async def enviar_resumen_usa_dia(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Obtiene y envía el resumen del día para acciones USA, habilitado al cierre del mercado."""
+
+    # Define US Eastern Timezone
+    eastern = pytz.timezone('America/New_York')
+    now_et = datetime.now(eastern)
+
+    # US Market hours: 9:30 AM to 4:00 PM ET, Monday to Friday
+    market_open_time = now_et.replace(hour=9, minute=30, second=0, microsecond=0)
+    market_close_time = now_et.replace(hour=16, minute=0, second=0, microsecond=0)
+
+    is_weekday = 0 <= now_et.weekday() <= 4 # Monday=0, Friday=4
+    is_market_open = is_weekday and market_open_time <= now_et <= market_close_time
+
+    chat_id = None
+    if update.callback_query:
+        chat_id = update.callback_query.message.chat_id
+    elif update.message:
+        chat_id = update.message.chat_id
+
+    if not chat_id:
+        print("❌ No se pudo determinar el chat_id para enviar el Resumen del Día.")
+        return
+
+    if is_market_open:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="⚠️ **El mercado de USA está actualmente ABIERTO.**\n\n📊 **El resumen del día estará disponible una vez que el mercado cierre (después de las 16:00 ET).**",
+            parse_mode='Markdown'
+        )
+        return
+
+    # If market is closed, proceed with fetching data
+    tickers_para_resumen_usa = TOP_USA_STOCKS_CURATED[:20] # Use a subset for daily summary
+
+    resultados_dia = []
+
+    message_to_edit = None
+    if update.callback_query:
+        message_to_edit = update.callback_query.message
+    elif update.message:
+        message_to_edit = update.message
+    
+    if message_to_edit:
+        await message_to_edit.edit_text("📈 **Cargando Resumen del Día (USA)...**\n⏳ **Esto puede tomar unos segundos...**", parse_mode='Markdown')
+
+
+    for ticker in tickers_para_resumen_usa:
+        try:
+            # Fetch data for the last 2 days to get open and close for today
+            df = yf.download(ticker, period='2d', interval='1d', progress=False, show_errors=False)
+            if not df.empty and 'Close' in df.columns and 'Open' in df.columns and len(df) >= 2:
+                # Get today's data (last row)
+                today_data = df.iloc[-1]
+                yesterday_close = df['Close'].iloc[-2] if len(df) > 1 else today_data['Open'] # Fallback if only one day
+                
+                precio_cierre_hoy = float(today_data['Close'])
+                precio_apertura_hoy = float(today_data['Open'])
+                
+                # Calculate change from market open
+                cambio_desde_apertura = precio_cierre_hoy - precio_apertura_hoy
+                cambio_porcentaje_desde_apertura = (cambio_desde_apertura / precio_apertura_hoy) * 100 if precio_apertura_hoy != 0 else 0
+                
+                # Calculate change from previous close
+                cambio_desde_ayer = precio_cierre_hoy - yesterday_close
+                cambio_porcentaje_desde_ayer = (cambio_desde_ayer / yesterday_close) * 100 if yesterday_close != 0 else 0
+
+                resultados_dia.append({
+                    'ticker': ticker,
+                    'precio_cierre': precio_cierre_hoy,
+                    'cambio_apertura_pct': cambio_porcentaje_desde_apertura,
+                    'cambio_ayer_pct': cambio_porcentaje_desde_ayer
+                })
+        except Exception as e:
+            print(f"❌ Error obteniendo datos para Resumen USA de {ticker}: {e}")
+            continue
+            
+    if not resultados_dia:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="❌ **No se pudieron obtener datos para el Resumen del Día (USA) en este momento.**\n\n💡 **Intenta de nuevo más tarde.**",
+            parse_mode='Markdown'
+        )
+        return
+
+    # Ordenar por cambio porcentual desde apertura (mayor a menor)
+    resumen_ordenado = sorted(resultados_dia, key=lambda x: x['cambio_apertura_pct'], reverse=True)
+
+    mensaje_resumen_usa = "📈 **RESUMEN DEL DÍA (USA)** 📈\n"
+    mensaje_resumen_usa += f"{'='*40}\n"
+    mensaje_resumen_usa += f"🕐 **Cierre de Mercado:** {now_et.strftime('%Y-%m-%d %H:%M ET')}\n\n"
+    mensaje_resumen_usa += "📊 **Principales Movimientos (vs. Apertura):**\n"
+
+    if resumen_ordenado:
+        for i, accion in enumerate(resumen_ordenado[:10], 1): # Show top 10 movers
+            emoji = "🟢" if accion['cambio_apertura_pct'] >= 0 else "🔴"
+            mensaje_resumen_usa += f"{i}. {emoji} **{accion['ticker']}:** ${accion['precio_cierre']:.2f} ({accion['cambio_apertura_pct']:+.2f}%)\n"
+    else:
+        mensaje_resumen_usa += "No hay acciones disponibles para mostrar en el resumen."
+        
+    mensaje_resumen_usa += f"\n⚠️ **Recuerda:** Este análisis es educativo, no consejo financiero."
+
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=mensaje_resumen_usa,
+        parse_mode='Markdown'
+    )
+
+# This function is kept for compatibility if needed elsewhere, but 'resumen_usa_dia' replaces its main use case.
 async def enviar_top_10_dia(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Obtiene y envía el Top 10 de acciones del día (USA y Argentina)"""
     
-    # Curated list of popular and liquid stocks for Top 10
-    # This list can be expanded or dynamically fetched from a source if available
-    tickers_para_top_10 = [
-        "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "NFLX", "AMD", "JPM", # USA
-        "YPF.BA", "GGAL.BA", "BMA.BA", "PAMP.BA", "TXAR.BA", "ALUA.BA", "CEPU.BA", "LOMA.BA", # Argentina
-        "KO", "PEP", "V", "MA", "DIS", # More USA
-        "BBAR.BA", "CEPU.BA", "EDN.BA", # More Argentina
-    ]
+    tickers_para_top_10 = TOP_USA_STOCKS_CURATED[:10] + TOP_ARGENTINA_STOCKS_CURATED[:10] # Mix of top popular
     
     resultados_dia = []
     
-    # Determine chat_id for sending messages
     chat_id = None
     if update.callback_query:
         chat_id = update.callback_query.message.chat_id
@@ -1449,7 +1717,6 @@ async def enviar_top_10_dia(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print("❌ No se pudo determinar el chat_id para enviar el Top 10.")
         return
 
-    # Send initial loading message
     message_to_edit = None
     if update.callback_query:
         message_to_edit = update.callback_query.message
@@ -1499,7 +1766,7 @@ async def enviar_top_10_dia(update: Update, context: ContextTypes.DEFAULT_TYPE):
         mensaje_top_10 += "No hay acciones disponibles para mostrar en el Top 10."
         
     mensaje_top_10 += f"\n⚠️ **Recuerda:** Este análisis es educativo, no consejo financiero."
-    
+
     await context.bot.send_message(
         chat_id=chat_id, # Use chat_id directly
         text=mensaje_top_10,
