@@ -19,18 +19,24 @@ USUARIOS_FILE = "usuarios_registrados.json"
 # Diccionario para almacenar usuarios activos
 usuarios_registrados = {}
 
-# Mapeo de tickers argentinos con alternativas
+# Mapeo extendido de tickers argentinos con alternativas
 TICKERS_ARGENTINOS = {
-    "YPF": ["YPF.BA", "YPF"],
-    "GGAL": ["GGAL.BA", "GGAL"],
-    "BMA": ["BMA.BA", "BMA"],
-    "PAMP": ["PAMP.BA", "PAMP"],
-    "TXAR": ["TXAR.BA", "TXAR"],
-    "ALUA": ["ALUA.BA", "ALUA"],
-    "TECO2": ["TECO2.BA", "TECO2"],
-    "MIRG": ["MIRG.BA", "MIRG"],
-    "SUPV": ["SUPV.BA", "SUPV"],
-    "CRES": ["CRES.BA", "CRES"]
+    "YPF": ["YPF", "YPF.BA", "YPFD"],
+    "GGAL": ["GGAL", "GGAL.BA"],
+    "BMA": ["BMA", "BMA.BA"],
+    "PAMP": ["PAMP", "PAMP.BA"],
+    "TXAR": ["TXAR", "TXAR.BA"],
+    "ALUA": ["ALUA", "ALUA.BA"],
+    "TECO2": ["TECO2", "TECO2.BA"],
+    "MIRG": ["MIRG", "MIRG.BA"],
+    "SUPV": ["SUPV", "SUPV.BA"],
+    "CRES": ["CRES", "CRES.BA"],
+    "TRAN": ["TRAN", "TRAN.BA"],
+    "LOMA": ["LOMA", "LOMA.BA"],
+    "CEPU": ["CEPU", "CEPU.BA"],
+    "COME": ["COME", "COME.BA"],
+    "BYMA": ["BYMA", "BYMA.BA"],
+    "TX": ["TX", "TXAR", "TXAR.BA"],
 }
 
 def cargar_usuarios():
@@ -142,29 +148,142 @@ def obtener_datos_accion(ticker_original):
     """Intenta obtener datos de una acción probando diferentes variantes del ticker"""
     ticker = ticker_original.upper().strip()
     
-    # Lista de variantes a probar
+    # Lista extendida de variantes a probar
     variantes = []
     
     # Si es un ticker argentino conocido, usar las alternativas
-    ticker_base = ticker.replace('.BA', '').replace('.AR', '')
+    ticker_base = ticker.replace('.BA', '').replace('.AR', '').replace('.NYSE', '').replace('.NASDAQ', '')
     if ticker_base in TICKERS_ARGENTINOS:
         variantes.extend(TICKERS_ARGENTINOS[ticker_base])
-    else:
-        # Probar variantes comunes
-        variantes = [ticker, f"{ticker}.BA", f"{ticker}.AR", ticker_base]
+    
+    # Agregar variantes comunes para todos los tickers
+    variantes.extend([
+        ticker,                    # Ticker original
+        f"{ticker}.BA",           # Buenos Aires
+        f"{ticker}.AR",           # Argentina
+        f"{ticker_base}",         # Sin sufijos
+        f"{ticker_base}.BA",      # Base + BA
+        f"{ticker_base}.NYSE",    # NYSE
+        f"{ticker_base}.NASDAQ",  # NASDAQ
+    ])
     
     # Eliminar duplicados manteniendo el orden
     variantes = list(dict.fromkeys(variantes))
     
-    for variante in variantes:
+    print(f"🔍 Probando variantes para {ticker_original}: {variantes[:3]}...")
+    
+    for i, variante in enumerate(variantes):
         try:
-            df = yf.download(variante, period='6mo', interval='1d', progress=False)
-            if not df.empty and 'Close' in df.columns and len(df) > 10:
+            print(f"  Intentando {i+1}/{len(variantes)}: {variante}")
+            df = yf.download(variante, period='3mo', interval='1d', progress=False, show_errors=False)
+            
+            if not df.empty and 'Close' in df.columns and len(df) > 5:
+                print(f"✅ Datos encontrados para {variante}")
                 return df, variante
+                
         except Exception as e:
+            print(f"  ❌ Error con {variante}: {str(e)[:50]}")
             continue
     
+    print(f"❌ No se encontraron datos para ninguna variante de {ticker_original}")
     return None, None
+
+def buscar_ticker_inteligente(ticker_input):
+    """Búsqueda inteligente de ticker con sugerencias"""
+    ticker = ticker_input.upper().strip()
+    
+    # Diccionario de tickers comunes y sus variantes
+    TICKERS_COMUNES = {
+        # USA - Tech
+        'APPLE': 'AAPL', 'AAPL': 'AAPL',
+        'TESLA': 'TSLA', 'TSLA': 'TSLA',
+        'MICROSOFT': 'MSFT', 'MSFT': 'MSFT',
+        'GOOGLE': 'GOOGL', 'GOOGL': 'GOOGL', 'GOOG': 'GOOGL',
+        'AMAZON': 'AMZN', 'AMZN': 'AMZN',
+        'NVIDIA': 'NVDA', 'NVDA': 'NVDA',
+        'META': 'META', 'FACEBOOK': 'META',
+        'NETFLIX': 'NFLX', 'NFLX': 'NFLX',
+        'AMD': 'AMD',
+        
+        # Argentina
+        'YPF': 'YPF', 'YPFD': 'YPF',
+        'GALICIA': 'GGAL', 'GGAL': 'GGAL',
+        'MACRO': 'BMA', 'BMA': 'BMA',
+        'PAMPA': 'PAMP', 'PAMP': 'PAMP',
+        'TERNIUM': 'TX', 'TX': 'TX',
+        'ALUAR': 'ALUA', 'ALUA': 'ALUA',
+    }
+    
+    # Buscar coincidencia exacta o por nombre
+    if ticker in TICKERS_COMUNES:
+        return TICKERS_COMUNES[ticker]
+    
+    # Buscar coincidencias parciales
+    for nombre, simbolo in TICKERS_COMUNES.items():
+        if ticker in nombre or nombre in ticker:
+            return simbolo
+    
+    return ticker
+
+def validar_ticker_con_sugerencias(ticker_input):
+    """Valida un ticker y proporciona sugerencias si falla"""
+    # Limpiar input
+    ticker_limpio = buscar_ticker_inteligente(ticker_input)
+    
+    # Intentar obtener datos
+    df, ticker_encontrado = obtener_datos_accion(ticker_limpio)
+    
+    if df is not None:
+        return True, ticker_encontrado, None
+    
+    # Si falla, generar sugerencias
+    sugerencias = generar_sugerencias_ticker(ticker_input)
+    return False, None, sugerencias
+
+def generar_sugerencias_ticker(ticker_input):
+    """Genera sugerencias cuando un ticker no se encuentra"""
+    ticker = ticker_input.upper().strip()
+    
+    sugerencias = []
+    
+    # Sugerencias basadas en similitud
+    SUGERENCIAS_COMUNES = {
+        'APPL': 'AAPL (Apple)',
+        'TESLAS': 'TSLA (Tesla)', 
+        'TESLA': 'TSLA (Tesla)',
+        'MICROSFT': 'MSFT (Microsoft)',
+        'MICROSOFT': 'MSFT (Microsoft)',
+        'GOOGEL': 'GOOGL (Google)',
+        'GOOGLE': 'GOOGL (Google)',
+        'AMAZN': 'AMZN (Amazon)',
+        'AMAZON': 'AMZN (Amazon)',
+        'NVIDEA': 'NVDA (Nvidia)',
+        'NVIDIA': 'NVDA (Nvidia)',
+        'FACEBOOK': 'META (Meta/Facebook)',
+        'GALICIA': 'GGAL (Banco Galicia)',
+        'MACRO': 'BMA (Banco Macro)',
+        'PAMPA': 'PAMP (Pampa Energía)',
+    }
+    
+    # Buscar sugerencias exactas
+    if ticker in SUGERENCIAS_COMUNES:
+        sugerencias.append(SUGERENCIAS_COMUNES[ticker])
+    
+    # Buscar sugerencias por similitud
+    for error_comun, sugerencia in SUGERENCIAS_COMUNES.items():
+        if abs(len(ticker) - len(error_comun)) <= 2:  # Longitud similar
+            coincidencias = sum(1 for a, b in zip(ticker, error_comun) if a == b)
+            if coincidencias >= len(ticker) - 2:  # Máximo 2 diferencias
+                sugerencias.append(sugerencia)
+    
+    # Agregar sugerencias populares si no hay coincidencias
+    if not sugerencias:
+        sugerencias = [
+            'AAPL (Apple)', 'TSLA (Tesla)', 'MSFT (Microsoft)',
+            'GOOGL (Google)', 'YPF (YPF)', 'GGAL (Galicia)'
+        ]
+    
+    return sugerencias[:3]  # Máximo 3 sugerencias
 
 def normalizar_datos(datos):
     """Normaliza los datos para asegurar que sean 1D"""
@@ -803,38 +922,44 @@ async def analizar_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
             last_name=user.last_name
         )
     
-    # Convertir ticker a mayúsculas automáticamente
-    ticker = str(update.message.text).strip().upper()
+    # Obtener input del usuario
+    ticker_input = str(update.message.text).strip()
     
     # Verificar si está en modo setup manual
     if context.user_data.get('modo') == 'setup_manual':
         usuario_info = usuarios_registrados[chat_id]
         favoritas_usuario = usuario_info.get('acciones_favoritas', [])
         
-        # Verificar que el ticker no esté ya en favoritas
-        if ticker in favoritas_usuario:
-            await update.message.reply_text(
-                f"⚠️ {ticker} ya está en tu lista\n\n📋 Favoritas actuales: {', '.join(favoritas_usuario)}\n\n🎯 Escribe otra acción:",
-                parse_mode='Markdown'
-            )
-        else:
-            # Verificar que el ticker sea válido
-            await update.message.reply_text(f"🔍 Verificando {ticker}...", parse_mode='Markdown')
-            df, ticker_usado = obtener_datos_accion(ticker)
-            
-            if df is not None:
-                favoritas_usuario.append(ticker_usado)
+        # Mostrar mensaje de búsqueda
+        mensaje_busqueda = await update.message.reply_text(
+            f"🔍 **Buscando '{ticker_input}'...**\n⏳ **Verificando en múltiples mercados...**",
+            parse_mode='Markdown'
+        )
+        
+        # Validar ticker con sugerencias
+        es_valido, ticker_encontrado, sugerencias = validar_ticker_con_sugerencias(ticker_input)
+        
+        if es_valido:
+            # Verificar que no esté ya en favoritas
+            if ticker_encontrado in favoritas_usuario:
+                await mensaje_busqueda.edit_text(
+                    f"⚠️ **{ticker_encontrado} ya está en tu lista**\n\n📋 **Favoritas actuales:** {', '.join(favoritas_usuario)}\n\n🎯 **Escribe otra acción:**",
+                    parse_mode='Markdown'
+                )
+            else:
+                # Agregar a favoritas
+                favoritas_usuario.append(ticker_encontrado)
                 usuarios_registrados[chat_id]['acciones_favoritas'] = favoritas_usuario
                 guardar_usuarios()
                 
-                await update.message.reply_text(
-                    f"✅ {ticker_usado} agregada exitosamente\n\n⭐ Favoritas: {len(favoritas_usuario)}\n📋 Lista: {', '.join(favoritas_usuario)}\n\n🎯 Mínimo requerido: 3",
+                await mensaje_busqueda.edit_text(
+                    f"✅ **{ticker_encontrado} agregada exitosamente**\n\n⭐ **Favoritas:** {len(favoritas_usuario)}\n📋 **Lista:** {', '.join(favoritas_usuario)}\n\n🎯 **Mínimo requerido:** 3",
                     parse_mode='Markdown'
                 )
                 
                 if len(favoritas_usuario) >= 3:
                     await update.message.reply_text(
-                        f"🎉 ¡Ya tienes {len(favoritas_usuario)} favoritas!\n\n✅ Puedes finalizar el setup o agregar más",
+                        f"🎉 **¡Ya tienes {len(favoritas_usuario)} favoritas!**\n\n✅ **Puedes finalizar el setup o agregar más**",
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton("✅ Finalizar Setup", callback_data="finalizar_setup")],
                             [InlineKeyboardButton("➕ Agregar Más", callback_data="setup_sugerencias")]
@@ -843,40 +968,77 @@ async def analizar_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     )
                 else:
                     await update.message.reply_text(
-                        f"🎯 Necesitas {3 - len(favoritas_usuario)} más\n\n💡 Escribe otra acción o usa el menú:",
+                        f"🎯 **Necesitas {3 - len(favoritas_usuario)} más**\n\n💡 **Escribe otra acción o usa el menú:**",
                         reply_markup=crear_menu_setup_inicial(),
                         parse_mode='Markdown'
                     )
+        else:
+            # Ticker no encontrado, mostrar sugerencias
+            mensaje_error = f"❌ **No se encontraron datos para '{ticker_input}'**\n\n"
+            
+            if sugerencias:
+                mensaje_error += f"💡 **¿Quisiste decir alguna de estas?**\n"
+                for sugerencia in sugerencias:
+                    mensaje_error += f"• {sugerencia}\n"
+                mensaje_error += f"\n📝 **Escribe el símbolo correcto o prueba con:**\n"
             else:
-                await update.message.reply_text(
-                    f"❌ No se encontraron datos para {ticker}\n\n💡 Verifica el símbolo e intenta de nuevo",
-                    parse_mode='Markdown'
-                )
+                mensaje_error += f"💡 **Verifica el símbolo e intenta de nuevo**\n\n"
+            
+            mensaje_error += f"🔥 **Ejemplos populares:**\n"
+            mensaje_error += f"• **USA:** AAPL, TSLA, MSFT, GOOGL\n"
+            mensaje_error += f"• **Argentina:** YPF, GGAL, BMA, PAMP\n\n"
+            mensaje_error += f"💡 **Tips:**\n"
+            mensaje_error += f"• Usa solo el símbolo (ej: AAPL)\n"
+            mensaje_error += f"• Para Argentina puedes usar YPF o YPF.BA\n"
+            mensaje_error += f"• Verifica la ortografía"
+            
+            await mensaje_busqueda.edit_text(mensaje_error, parse_mode='Markdown')
         
-        context.user_data['modo'] = None
+        context.user_data['modo'] = 'setup_manual'  # Mantener el modo activo
     
     else:
         # Verificar setup completo
         if not usuarios_registrados[chat_id].get('setup_completo', False):
             await update.message.reply_text(
-                "⚠️ CONFIGURACIÓN PENDIENTE\n\n🎯 Completa tu setup primero",
+                "⚠️ **CONFIGURACIÓN PENDIENTE**\n\n🎯 **Completa tu setup primero**",
                 reply_markup=crear_menu_setup_inicial(),
                 parse_mode='Markdown'
             )
             return
         
         # Análisis normal
-        await update.message.reply_text(f"🔍 Analizando {ticker}...\n⏳ Calculando indicadores y sugerencias...", parse_mode='Markdown')
-        
-        respuesta, _, _ = analizar_accion_completa(ticker)
-        await update.message.reply_text(respuesta)
-        
-        # Mostrar menú después del análisis
-        await update.message.reply_text(
-            "🎯 ¿Qué más quieres hacer?\n👇 Usa el menú para más opciones 👇",
-            reply_markup=crear_menu_principal(),
+        mensaje_analisis = await update.message.reply_text(
+            f"🔍 **Analizando '{ticker_input}'...**\n⏳ **Calculando indicadores y sugerencias...**", 
             parse_mode='Markdown'
         )
+        
+        # Validar y analizar
+        es_valido, ticker_encontrado, sugerencias = validar_ticker_con_sugerencias(ticker_input)
+        
+        if es_valido:
+            respuesta, _, _ = analizar_accion_completa(ticker_encontrado)
+            await mensaje_analisis.edit_text(respuesta)
+            
+            # Mostrar menú después del análisis
+            await update.message.reply_text(
+                "🎯 **¿Qué más quieres hacer?**\n👇 **Usa el menú para más opciones** 👇",
+                reply_markup=crear_menu_principal(),
+                parse_mode='Markdown'
+            )
+        else:
+            # Error en análisis
+            mensaje_error = f"❌ **No se encontraron datos para '{ticker_input}'**\n\n"
+            
+            if sugerencias:
+                mensaje_error += f"💡 **¿Quisiste decir alguna de estas?**\n"
+                for sugerencia in sugerencias:
+                    mensaje_error += f"• {sugerencia}\n"
+            
+            mensaje_error += f"\n🔥 **Prueba con estos populares:**\n"
+            mensaje_error += f"• AAPL, TSLA, MSFT, GOOGL, AMZN\n"
+            mensaje_error += f"• YPF, GGAL, BMA, PAMP"
+            
+            await mensaje_analisis.edit_text(mensaje_error, parse_mode='Markdown')
 
 async def enviar_alertas(context: ContextTypes.DEFAULT_TYPE):
     """Envía alertas inteligentes comparando TODAS las favoritas y recomendando la mejor"""
