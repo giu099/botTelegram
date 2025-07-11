@@ -1057,6 +1057,7 @@ async def analizar_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     
     else: # Default behavior if no specific mode is set (e.g., user just types a ticker)
+        # Check if setup is complete first
         if not usuarios_registrados[chat_id].get('setup_completo', False):
             await update.message.reply_text(
                 f"⚠️ **CONFIGURACIÓN PENDIENTE**\n\n🎯 **Completa tu setup primero**",
@@ -1064,17 +1065,36 @@ async def analizar_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode='Markdown'
             )
             return
-        
+
         mensaje_analisis = await update.message.reply_text(
-            f"🔍 **Analizando '{ticker_input}'...**\n⏳ **Calculando indicadores y sugerencias...**", 
+            f"🔍 **Procesando '{ticker_input}'...**\n⏳ **Verificando y analizando...**",
             parse_mode='Markdown'
         )
-        
+
         es_valido, ticker_encontrado, sugerencias = validar_ticker_con_sugerencias(ticker_input)
-        
+
         if es_valido:
+            usuario_info = usuarios_registrados[chat_id]
+            favoritas_usuario = usuario_info.get('acciones_favoritas', [])
+
+            if ticker_encontrado not in favoritas_usuario:
+                favoritas_usuario.append(ticker_encontrado)
+                usuarios_registrados[chat_id]['acciones_favoritas'] = favoritas_usuario
+                guardar_usuarios()
+                await mensaje_analisis.edit_text(
+                    f"✅ **'{ticker_encontrado}' agregada a tus favoritas y analizando...**",
+                    parse_mode='Markdown'
+                )
+            else:
+                await mensaje_analisis.edit_text(
+                    f"ℹ️ **'{ticker_encontrado}' ya está en tus favoritas. Analizando...**",
+                    parse_mode='Markdown'
+                )
+
             respuesta, _, _ = analizar_accion_completa(ticker_encontrado)
-            await mensaje_analisis.edit_text(respuesta, parse_mode='Markdown')
+            # Send analysis as a new message to avoid editing the "added to favorites" message
+            await context.bot.send_message(chat_id=chat_id, text=respuesta, parse_mode='Markdown')
+
         else:
             mensaje_error = f"❌ **No se encontraron datos para '{ticker_input}'**\n\n"
             if sugerencias:
@@ -1085,7 +1105,7 @@ async def analizar_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
             mensaje_error += f"• AAPL, TSLA, MSFT, GOOGL, AMZN\n"
             mensaje_error += f"• YPF, GGAL, BMA, PAMP"
             await mensaje_analisis.edit_text(mensaje_error, parse_mode='Markdown')
-        
+
         await update.message.reply_text(
             "🎯 **¿Qué más quieres hacer?**\n👇 **Usa el menú para más opciones** 👇",
             reply_markup=crear_menu_principal(),
