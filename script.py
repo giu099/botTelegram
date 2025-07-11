@@ -911,6 +911,7 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     
     elif query.data == "analizar_cualquier":
+        # Este es el punto donde el bot pide el input
         await query.edit_message_text(
             """📝 **Escribe el símbolo de la acción que quieres analizar**
 
@@ -927,7 +928,7 @@ async def manejar_botones(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='Markdown',
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Volver al Menú", callback_data="menu")]])
         )
-        context.user_data['modo'] = 'analizar_cualquier' # Set mode for next message
+        context.user_data['modo'] = 'analizar_cualquier' # Se establece el modo para el siguiente mensaje
     
     elif query.data == "top_10_dia":
         await query.edit_message_text("📈 **Cargando Top 10 del Día...**\n⏳ **Esto puede tomar unos segundos...**", parse_mode='Markdown')
@@ -1027,6 +1028,7 @@ async def analizar_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data['modo'] = None # Clear mode if setup is complete
 
     elif current_mode == 'analizar_cualquier':
+        # Este es el punto donde se recibe el input del usuario para análisis
         mensaje_analisis = await update.message.reply_text(
             f"🔍 **Analizando '{ticker_input}'...**\n⏳ **Calculando indicadores y sugerencias...**", 
             parse_mode='Markdown'
@@ -1048,7 +1050,7 @@ async def analizar_manual(update: Update, context: ContextTypes.DEFAULT_TYPE):
             mensaje_error += f"• YPF, GGAL, BMA, PAMP"
             await mensaje_analisis.edit_text(mensaje_error, parse_mode='Markdown')
         
-        context.user_data['modo'] = None # Clear mode after analysis
+        context.user_data['modo'] = None # Se limpia el modo después del análisis
         
         await update.message.reply_text(
             "🎯 **¿Qué más quieres hacer?**\n👇 **Usa el menú para más opciones** 👇",
